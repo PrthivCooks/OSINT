@@ -1,68 +1,55 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from google_search_results import GoogleSearch
-from urllib.parse import parse_qsl, urlsplit
-import json
+from serpapi import GoogleSearch  # Correct import for Python SerpAPI
 
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
 
-SERPAPI_API_KEY = "85c261d44fa7d3f382a97b305a953bb0f58b9ab395f57b396a887cdf415235e7"  # Replace with your real API key
+SERPAPI_API_KEY = "85c261d44fa7d3f382a97b305a953bb0f58b9ab395f57b396a887cdf415235e7"
 
-def fetch_news_with_serpapi(keyword, start_date=None, end_date=None, location="us"):
-    """ Fetch news articles using SerpAPI with optional date filtering. """
+def fetch_news_with_serpapi(keyword, location="us"):
+    """ Fetch news articles using SerpAPI's Google News Engine. """
     params = {
-        "api_key": SERPAPI_API_KEY,
-        "engine": "google",
+        "engine": "google_news",
         "q": keyword,
-        "gl": location,
-        "hl": "en",
-        "num": "50",
-        "tbm": "nws"  # Google News Search
+        "gl": location,  # Geolocation (Country Code)
+        "hl": "en",  # Language (English)
+        "api_key": SERPAPI_API_KEY
     }
 
-    # Apply date range filtering if provided
-    if start_date and end_date:
-        params["tbs"] = f"cdr:1,cd_min:{start_date},cd_max:{end_date}"
-
     search = GoogleSearch(params)
-    all_results = {"name": f"News about {keyword}", "news_results": []}
+    results = search.get_dict()  # Get results as dictionary
 
-    try:
-        results = search.get_dict()
-        if "error" in results:
-            return {"error": results["error"]}
-
-        # Extract relevant news results
-        for result in results.get("news_results", []):
-            news_entry = {
-                "title": result.get("title"),
-                "link": result.get("link"),
-                "source": result.get("source"),
-                "date": result.get("date"),
-                "thumbnail": result.get("thumbnail")
-            }
-            all_results["news_results"].append(news_entry)
-    
-    except Exception as e:
-        return {"error": str(e)}
-
-    return all_results
+    # Extract and structure news results
+    if "news_results" in results:
+        return {
+            "name": f"News about {keyword}",
+            "news_results": [
+                {
+                    "title": article.get("title"),
+                    "link": article.get("link"),
+                    "source": article.get("source"),
+                    "date": article.get("date"),
+                    "thumbnail": article.get("thumbnail"),
+                }
+                for article in results["news_results"]
+            ]
+        }
+    else:
+        return {"error": "No news results found."}
 
 @app.route('/api/news', methods=['POST'])
 def get_news():
-    """ API endpoint to fetch news based on keyword and filters. """
+    """ API endpoint to fetch Google News based on a keyword. """
     data = request.json
     keyword = data.get('keyword', '')
-    start_date = data.get('start_date', '')
-    end_date = data.get('end_date', '')
     location = data.get('location', 'us')
 
     if not keyword:
         return jsonify({"error": "Keyword is required."}), 400
 
-    news_data = fetch_news_with_serpapi(keyword, start_date, end_date, location)
+    news_data = fetch_news_with_serpapi(keyword, location)
     return jsonify(news_data)
 
 @app.route('/')
