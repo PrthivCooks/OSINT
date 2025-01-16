@@ -1,4 +1,5 @@
 Flask
-Flask-CORS
-serpapi
-gunicorn  
+flask-cors
+gunicorn
+google-search-results
+requests
